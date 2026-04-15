@@ -2,8 +2,8 @@
 ==============================================================
 Day 10 Lab: Build Your First Automated ETL Pipeline
 ==============================================================
-Student ID: AI20K-XXXX  (<-- Thay XXXX bang ma so cua ban)
-Name: Your Name Here
+Student ID: AI20K-202600164 (<-- Thay XXXX bang ma so cua ban)
+Name: Nguyen Hoang Viet Hung
 
 Nhiem vu:
    1. Extract:   Doc du lieu tu file JSON
@@ -42,12 +42,25 @@ def extract(file_path):
         list: Danh sach cac records (dictionaries)
     """
     print(f"Extracting data from {file_path}...")
-    # TODO: Viet code doc file JSON o day
-    # Vi du:
-    #   with open(file_path, 'r') as f:
-    #       data = json.load(f)
-    #   return data
-    pass
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+
+        if not isinstance(data, list):
+            print("Extract error: JSON root must be a list of records.")
+            return []
+
+        print(f"Extract complete: {len(data)} records loaded.")
+        return data
+    except FileNotFoundError:
+        print(f"Extract error: File not found: {file_path}")
+        return []
+    except json.JSONDecodeError as e:
+        print(f"Extract error: Invalid JSON format ({e})")
+        return []
+    except Exception as e:
+        print(f"Extract error: {e}")
+        return []
 
 
 def validate(data):
@@ -69,10 +82,23 @@ def validate(data):
     valid_records = []
     error_count = 0
 
-    # TODO: Lap qua data, kiem tra tung record
-    # Giu lai record hop le, dem record loi
+    for record in data:
+        try:
+            price = float(record.get('price', 0))
+            category = str(record.get('category', '')).strip()
 
-    print(f"Validation complete. Valid: {len(valid_records)}, Errors: {error_count}")
+            if price <= 0 or category == '':
+                error_count += 1
+                continue
+
+            cleaned_record = record.copy()
+            cleaned_record['price'] = price
+            cleaned_record['category'] = category
+            valid_records.append(cleaned_record)
+        except Exception:
+            error_count += 1
+
+    print(f"Validation summary: {len(valid_records)} kept, {error_count} dropped.")
     return valid_records
 
 
@@ -94,8 +120,25 @@ def transform(data):
     Returns:
         pd.DataFrame: DataFrame da duoc transform
     """
-    # TODO: Tao DataFrame va ap dung transformations
-    pass
+    if not data:
+        print("Transform warning: 0 valid records to process.")
+        return pd.DataFrame(
+            columns=['id', 'product', 'price', 'category', 'discounted_price', 'processed_at']
+        )
+
+    df = pd.DataFrame(data)
+
+    if 'price' not in df.columns or 'category' not in df.columns:
+        print("Transform error: Missing required columns.")
+        return None
+
+    df['price'] = pd.to_numeric(df['price'], errors='coerce')
+    df = df.dropna(subset=['price'])
+    df['discounted_price'] = df['price'] * 0.9
+    df['category'] = df['category'].astype(str).str.strip().str.title()
+    df['processed_at'] = datetime.datetime.now().isoformat()
+
+    return df
 
 
 def load(df, output_path):
@@ -105,13 +148,16 @@ def load(df, output_path):
     Goi y:
        - df.to_csv(output_path, index=False)
     """
-    # TODO: Luu DataFrame ra CSV
+    if df is None:
+        print("Load skipped: DataFrame is None.")
+        return
+
+    df.to_csv(output_path, index=False)
     print(f"Data saved to {output_path}")
 
 
 # ============================================================
 # MAIN PIPELINE
-# ============================================================
 if __name__ == "__main__":
     print("=" * 50)
     print("ETL Pipeline Started...")
